@@ -36,6 +36,16 @@ app.use('/api/payroll-records', payrollRecordsRouter);
 const publicDir = path.join(__dirname, '..', 'public');
 const buildDir = path.join(__dirname, '..', 'dist');
 const builtIndexPath = path.join(buildDir, 'index.html');
+const templatePath = path.join(process.env.USERPROFILE || process.env.HOME || '', 'Documents', 'sample-import-template.csv');
+
+app.get('/sample-import-template.csv', (req, res) => {
+  if (fs.existsSync(templatePath)) {
+    res.download(templatePath, 'sample-import-template.csv');
+    return;
+  }
+
+  res.status(404).send('Template not found');
+});
 
 app.get(/^\/(?!api\/).*/, (req, res, next) => {
   if (req.path.includes('.')) {

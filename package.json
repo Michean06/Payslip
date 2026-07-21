@@ -5,8 +5,9 @@
   "main": "api/server.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "dev:client": "vite",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "nodemon --watch server --watch .env --ext js,json server/index.js",
+    "dev:client": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test"
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^10.0.3",
     "form-data": "^4.0.6",
     "nodemon": "^2.0.22",
     "vite": "^5.4.10"

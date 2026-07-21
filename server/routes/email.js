@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const nodemailer = require('nodemailer');
 const supabase = require('../supabaseClient');
 const fallbackStore = require('../fallbackStore');
@@ -14,7 +16,11 @@ router.post('/:id', async (req, res) => {
     const id = req.params.id;
     let employee = null;
 
-    if (supabase) {
+    if (req.body?.employee) {
+      employee = normalizeEmployee(req.body.employee);
+    }
+
+    if (!employee && supabase) {
       try {
         const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
         if (!error && data) employee = normalizeEmployee(data);
@@ -74,7 +80,12 @@ router.post('/:id', async (req, res) => {
     const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
     if (!gmailUser || !gmailAppPassword) {
-      return res.status(500).json({ error: 'No email provider configured. Set BREVO_API_KEY or GMAIL_USER + GMAIL_APP_PASSWORD.' });
+      const localEmailDir = path.join(__dirname, '..', '..', '.tmp-email-preview');
+      fs.mkdirSync(localEmailDir, { recursive: true });
+      const previewFile = path.join(localEmailDir, `payslip-${id}-${Date.now()}.eml`);
+      const previewContent = `To: ${requestedEmail}\nSubject: ${subject}\n\n${messageBody}`;
+      fs.writeFileSync(previewFile, previewContent, 'utf8');
+      return res.json({ success: true, provider: 'local-preview', previewFile });
     }
 
     const transporter = nodemailer.createTransport({

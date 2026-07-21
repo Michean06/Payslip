@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Route, Routes } from 'react-router-dom';
-import { buildApiUrl, getEmailButtonLabel, parseResponsePayload } from './utils/uiHelpers.mjs';
+import { getEmailButtonLabel, requestApiJson } from './utils/uiHelpers.mjs';
 
 const SENT_EMAILS_KEY = 'payslip-sent-emails';
 const GENERATED_PDFS_KEY = 'payslip-generated';
@@ -26,23 +25,6 @@ function saveStoredIds(key, ids) {
   }
 
   window.localStorage.setItem(key, JSON.stringify([...ids]));
-}
-
-function FeaturesPage() {
-  return (
-    <section className="card">
-      <p className="eyebrow">What changed</p>
-      <h2>Modern frontend foundation</h2>
-      <ul className="feature-list">
-        <li>React 18 and Vite 5 power the client experience.</li>
-        <li>Upload payroll data, generate payslips, and send emails from the same page.</li>
-        <li>Express API routes remain intact for payroll, uploads, PDF, and email workflows.</li>
-      </ul>
-      <Link className="btn btn-secondary" to="/">
-        Back to dashboard
-      </Link>
-    </section>
-  );
 }
 
 function PayrollDashboard() {
@@ -86,10 +68,9 @@ function PayrollDashboard() {
     setUploadMessage(null);
 
     try {
-      const response = await fetch(buildApiUrl(apiBaseUrl, '/api/employees'));
-      const payload = await parseResponsePayload(response);
+      const { payload } = await requestApiJson(apiBaseUrl, '/api/employees');
 
-      if (!response.ok) {
+      if (payload?.error) {
         throw new Error(payload.error || 'Failed to load employees');
       }
 
@@ -118,13 +99,12 @@ function PayrollDashboard() {
     formData.append('file', file);
 
     try {
-      const response = await fetch(buildApiUrl(apiBaseUrl, '/api/upload'), {
+      const { payload } = await requestApiJson(apiBaseUrl, '/api/upload', {
         method: 'POST',
         body: formData
       });
-      const payload = await parseResponsePayload(response);
 
-      if (!response.ok || payload.error) {
+      if (payload?.error) {
         throw new Error(payload.error || 'Upload failed');
       }
 
@@ -141,12 +121,11 @@ function PayrollDashboard() {
 
   const handleGenerateOrView = async (employee) => {
     try {
-      const response = await fetch(buildApiUrl(apiBaseUrl, `/api/pdf/generate/${employee.id}`), {
+      const { payload } = await requestApiJson(apiBaseUrl, `/api/pdf/generate/${employee.id}`, {
         method: 'POST'
       });
-      const payload = await parseResponsePayload(response);
 
-      if (!response.ok || payload.error) {
+      if (payload?.error) {
         throw new Error(payload.error || 'Failed to generate payslip');
       }
 
@@ -192,14 +171,13 @@ function PayrollDashboard() {
     }
 
     try {
-      const response = await fetch(buildApiUrl(apiBaseUrl, `/api/email/${editingEmployee.id}`), {
+      const { payload } = await requestApiJson(apiBaseUrl, `/api/email/${editingEmployee.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailDraft.trim() })
+        body: JSON.stringify({ email: emailDraft.trim(), employee: editingEmployee })
       });
-      const payload = await parseResponsePayload(response);
 
-      if (!response.ok || payload.error) {
+      if (payload?.error) {
         throw new Error(payload.error || 'Failed to send email');
       }
 
@@ -236,12 +214,11 @@ function PayrollDashboard() {
     }
 
     try {
-      const response = await fetch(buildApiUrl(apiBaseUrl, '/api/payroll-records/clear-all?table=payroll_records'), {
+      const { payload } = await requestApiJson(apiBaseUrl, '/api/payroll-records/clear-all?table=payroll_records', {
         method: 'DELETE'
       });
-      const payload = await parseResponsePayload(response);
 
-      if (!response.ok || payload.error) {
+      if (payload?.error) {
         throw new Error(payload.error || 'Failed to clear payroll data');
       }
 
@@ -255,9 +232,7 @@ function PayrollDashboard() {
   return (
     <>
       <section className="card">
-        <p className="eyebrow">Import Excel</p>
         <h1>Payslip System</h1>
-        <p className="intro-text">Upload payroll data, generate payslips, and review employee records from a single dashboard.</p>
 
         <form onSubmit={handleUpload} className="upload-form">
           <label htmlFor="fileInput" className="field-label">Choose Excel File</label>
@@ -277,7 +252,6 @@ function PayrollDashboard() {
           </div>
         </form>
 
-        <p className="helper-text">Download the payslip import template and use its column names as the headers in your Excel file.</p>
 
         {uploadMessage ? (
           <div className={`status-message ${uploadMessage.type}`}>
@@ -398,15 +372,7 @@ function PayrollDashboard() {
 export default function App() {
   return (
     <div className="app-shell">
-      <nav className="topbar">
-        <Link to="/">Dashboard</Link>
-        <Link to="/features">Features</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<PayrollDashboard />} />
-        <Route path="/features" element={<FeaturesPage />} />
-      </Routes>
+      <PayrollDashboard />
     </div>
   );
 }
