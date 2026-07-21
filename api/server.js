@@ -40,16 +40,18 @@ function resolveFile(filePath) {
   return null;
 }
 
-module.exports = function handler(req, res) {
+const serverless = require('serverless-http');
+const expressApp = require('../server');
+const serverlessHandler = serverless(expressApp);
+
+module.exports = async function handler(req, res) {
   const requestUrl = req.url || '/';
   const parsed = new URL(requestUrl, `https://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsed.pathname);
 
   if (pathname.startsWith('/api/')) {
-    res.statusCode = 404;
-    res.setHeader('content-type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({ error: 'API routes are not available in this deployment mode.' }));
-    return;
+    // Delegate API requests to the Express app wrapped by serverless-http
+    return serverlessHandler(req, res);
   }
 
   const relativePath = pathname === '/' ? '' : pathname.replace(/^\/+/, '');
