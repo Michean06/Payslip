@@ -1,9 +1,8 @@
-const express = require('express');
+﻿const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const supabase = require('../supabaseClient');
-const fallbackStore = require('../fallbackStore');
-const { mapImportField, resolveTableFieldName } = require('../utils/employeeNormalizer');
+const { resolveTableFieldName } = require('../utils/employeeNormalizer');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -45,7 +44,6 @@ function buildColumnLookup(columns) {
 function excelSerialToISO(serial) {
   const n = Number(serial);
   if (Number.isNaN(n)) return null;
-  // Excel serial to JS date: days since 1899-12-30 -> convert via 25569 offset to UNIX epoch
   const ms = Math.round((n - 25569) * 86400 * 1000);
   const d = new Date(ms);
   if (isNaN(d.getTime())) return null;
@@ -54,14 +52,11 @@ function excelSerialToISO(serial) {
 
 function sanitizeValue(value, targetField) {
   if (value === null || value === undefined) return null;
-
-  // If target field looks like a date column and value is numeric, convert Excel serial
   const isDateField = typeof targetField === 'string' && /date/.test(targetField.toLowerCase());
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed === '') return null;
-    // numeric-looking strings
     if (!Number.isNaN(Number(trimmed))) {
       if (isDateField) return excelSerialToISO(trimmed);
       return Number(trimmed);
@@ -158,97 +153,60 @@ router.post('/', upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment and restart the server.'
+      });
+    }
 
-    // parse excel
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
 
-    // Map the downloadable template's labels to the corresponding database fields.
-    function normalizeCellRow(row) {
-      const normalized = {};
-      Object.entries(row).forEach(([key, value]) => {
-        const label = String(key || '').trim();
-        if (!label || /^(__EMPTY(?:_\d+)?|_+\d*)$/i.test(label)) return;
-        const rawName = HEADER_TO_COLUMN[label] || label
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, '_')
-          .replace(/[^a-z0-9_]/g, '');
-        const name = mapImportField(rawName);
-
-        if (value !== null && value !== undefined && value !== '' && !Number.isNaN(Number(value))) {
-          normalized[name] = Number(value);
-        } else {
-          normalized[name] = value;
-        }
-      });
-      return normalized;
-    }
-
     const existingColumns = await getTableColumns(tableName);
     const columnLookup = buildColumnLookup(existingColumns);
-    const employees = rows.map((r) => remapRowToColumns(r, columnLookup));
+    const employees = rows.map((row) => remapRowToColumns(row, columnLookup)).filter(Boolean);
 
-    let inserted = null;
-    let useFallback = !supabase;
+    const { data, error } = await supabase.from(tableName).insert(employees).select();
+    if (error) {
+      console.error('Supabase insert error', error);
+      const msg = String(error.message || '');
 
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from(tableName).insert(employees).select();
-        if (error) {
-          console.error('Supabase insert error', error);
-
-          // Detect Row Level Security (RLS) violation errors and give clearer guidance
-          const msg = String(error.message || '');
-          if (/row-level security|violates row-level security/i.test(msg)) {
-            const serverKeySet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-            const guidance = serverKeySet
-              ? `Supabase rejected the insert due to RLS. Check the table's row-level policies in the Supabase dashboard for \"${tableName}\".`
-              : `The server is not using a Supabase service-role key. Set SUPABASE_SERVICE_ROLE_KEY in your environment (see .env.example) and restart the server, or update the table's RLS policies to allow inserts.`;
-            return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
-          }
-
-          const missingColumn = /Could not find the '([^']+)' column/i.exec(msg);
-          const guidance = missingColumn
-            ? `The ${tableName} table is missing the required '${missingColumn[1]}' column. Run the updated schema.sql in the Supabase SQL Editor, then retry the import.`
-            : msg || String(error);
-          return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
-        } else {
-          inserted = data;
-        }
-      } catch (err) {
-        console.error('Supabase insert exception', err);
-        return res.status(502).json({ error: `Supabase insert failed: ${err.message || String(err)}`, table: tableName });
+      if (/row-level security|violates row-level security/i.test(msg)) {
+        const serverKeySet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const guidance = serverKeySet
+          ? `Supabase rejected the insert due to RLS. Check the table's row-level policies in the Supabase dashboard for "${tableName}".`
+          : `The server is not using a Supabase service-role key. Set SUPABASE_SERVICE_ROLE_KEY in your environment (see .env.example) and restart the server, or update the table's RLS policies to allow inserts.`;
+        return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
       }
+
+      const missingColumn = /Could not find the '([^']+)' column/i.exec(msg);
+      const guidance = missingColumn
+        ? `The ${tableName} table is missing the required '${missingColumn[1]}' column. Run the updated schema.sql in the Supabase SQL Editor, then retry the import.`
+        : msg || String(error);
+      return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
     }
 
     const fileName = `uploads/${Date.now()}-${file.originalname}`;
-    if (supabase) {
-      try {
-        const { error: storageError } = await supabase.storage.from(bucketName).upload(fileName, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false
-        });
-        if (storageError) console.warn('Storage upload warning', storageError.message || storageError);
-      } catch (err) {
-        console.warn('Storage upload exception', err);
-      }
+    try {
+      const { error: storageError } = await supabase.storage.from(bucketName).upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+      if (storageError) console.warn('Storage upload warning', storageError.message || storageError);
+    } catch (err) {
+      console.warn('Storage upload exception', err);
     }
 
-    const fallbackEmployees = useFallback ? fallbackStore.addEmployees(employees) : null;
-    const response = {
-      inserted: inserted || fallbackEmployees,
+    return res.json({
+      inserted: data,
       uploaded: fileName,
-      source: inserted ? 'supabase' : 'fallback',
-      warning: useFallback ? 'Supabase is not configured; saved locally instead.' : undefined
-    };
-
-    res.json(response);
+      source: 'supabase'
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: String(err) });
+    return res.status(500).json({ error: String(err) });
   }
 });
 
