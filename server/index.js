@@ -11,7 +11,7 @@ const emailRouter = require('./routes/email');
 const payrollRecordsRouter = require('./routes/payrollRecords');
 
 const app = express();
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000').split(',').map((origin) => origin.trim()).filter(Boolean);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173').split(',').map((origin) => origin.trim()).filter(Boolean);
 
 app.disable('x-powered-by');
 app.use(cors({
