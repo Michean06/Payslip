@@ -22,7 +22,11 @@ app.use('/api/payroll-records', payrollRecordsRouter);
 // static frontend
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Payslip system listening on port ${PORT}`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Payslip system listening on port ${PORT}`);
+  });
+}
+
+module.exports = app;
