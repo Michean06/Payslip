@@ -24,6 +24,18 @@ async function emailPayslip(id, email) {
   return res.json();
 }
 
+async function clearAllData() {
+  const confirmDelete = window.confirm('This will permanently delete all rows from the payroll records table. Continue?');
+  if (!confirmDelete) return;
+
+  const res = await fetch('/api/payroll-records/clear-all?table=payroll_records', { method: 'DELETE' });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || payload.error) {
+    throw new Error(payload.error || 'Failed to clear data');
+  }
+  return payload;
+}
+
 const SENT_EMAILS_KEY = 'payslip-sent-emails';
 const GENERATED_PDFS_KEY = 'payslip-generated';
 const EDIT_EMAILS_KEY = 'payslip-edit-email';
@@ -235,6 +247,21 @@ async function loadEmployees() {
 }
 
 document.getElementById('refreshBtn').addEventListener('click', loadEmployees);
+document.getElementById('clearDataBtn').addEventListener('click', async () => {
+  try {
+    const result = await clearAllData();
+    if (result.success) {
+      localStorage.removeItem(SENT_EMAILS_KEY);
+      localStorage.removeItem(GENERATED_PDFS_KEY);
+      localStorage.removeItem(EDIT_EMAILS_KEY);
+      localStorage.removeItem(DELETED_SENT_EMAILS_KEY);
+      await loadEmployees();
+      alert('✓ All payroll data deleted successfully');
+    }
+  } catch (err) {
+    alert('❌ Error: ' + err.message);
+  }
+});
 document.getElementById('generateAllBtn').addEventListener('click', async () => {
   const rows = document.querySelectorAll('#employeesTable tbody tr');
   for (const row of rows) {

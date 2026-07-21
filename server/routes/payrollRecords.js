@@ -116,4 +116,24 @@ router.get('/import-template', async (req, res) => {
   }
 });
 
+router.delete('/clear-all', async (req, res) => {
+  const tableName = getTableName(req.query.table || req.body?.table || 'payroll_records');
+  if (!tableName) return res.status(400).json({ error: 'Unsupported table requested.' });
+
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase client is not configured.' });
+  }
+
+  try {
+    const { error, count } = await supabase.from(tableName).delete().gt('id', 0);
+    if (error) {
+      return res.status(500).json({ error: error.message || String(error) });
+    }
+
+    return res.json({ success: true, table: tableName, deletedCount: count ?? null });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
 module.exports = router;
