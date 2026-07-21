@@ -1,5 +1,6 @@
 const express = require('express');
 const supabase = require('../supabaseClient');
+const { requireAdminAuthIfConfigured } = require('../middleware/adminAuth');
 const router = express.Router();
 
 const allowedTables = new Set(['employees', 'payroll_records']);
@@ -116,7 +117,7 @@ router.get('/import-template', async (req, res) => {
   }
 });
 
-router.delete('/clear-all', async (req, res) => {
+router.delete('/clear-all', requireAdminAuthIfConfigured, async (req, res) => {
   const tableName = getTableName(req.query.table || req.body?.table || 'payroll_records');
   if (!tableName) return res.status(400).json({ error: 'Unsupported table requested.' });
 

@@ -1,13 +1,14 @@
 ﻿const express = require('express');
-const multer = require('multer');
 const xlsx = require('xlsx');
 const supabase = require('../supabaseClient');
 const { resolveTableFieldName } = require('../utils/employeeNormalizer');
+const { parseMultipartUpload } = require('../utils/uploadParser');
+const { requireAdminAuthIfConfigured } = require('../middleware/adminAuth');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
 const tableName = process.env.SUPABASE_TABLE || 'payroll_records';
 const bucketName = process.env.SUPABASE_BUCKET || 'payslips';
+const maxUploadBytes = Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024);
 
 async function getTableColumns(tableName) {
   if (!supabase) return [];
@@ -149,9 +150,13 @@ const HEADER_TO_COLUMN = {
 };
 
 // POST /api/upload (multipart/form-data) field name: file
-router.post('/', upload.single('file'), async (req, res) => {
+router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
   try {
-    const file = req.file;
+    if (!req.headers['content-type'] || !req.headers['content-type'].includes('multipart/form-data')) {
+      return res.status(415).json({ error: 'Expected multipart/form-data upload.' });
+    }
+
+    const { file } = await parseMultipartUpload(req, { maxFileSize: maxUploadBytes });
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
     if (!supabase) {
       return res.status(500).json({
@@ -161,12 +166,21 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      return res.status(400).json({ error: 'The uploaded workbook is empty or unreadable.' });
+    }
     const sheet = workbook.Sheets[sheetName];
     const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rows.length) {
+      return res.status(400).json({ error: 'No rows were found in the uploaded file.' });
+    }
 
     const existingColumns = await getTableColumns(tableName);
     const columnLookup = buildColumnLookup(existingColumns);
     const employees = rows.map((row) => remapRowToColumns(row, columnLookup)).filter(Boolean);
+    if (!employees.length) {
+      return res.status(400).json({ error: 'The uploaded file did not produce any valid payroll rows.' });
+    }
 
     const { data, error } = await supabase.from(tableName).insert(employees).select();
     if (error) {
@@ -188,7 +202,8 @@ router.post('/', upload.single('file'), async (req, res) => {
       return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
     }
 
-    const fileName = `uploads/${Date.now()}-${file.originalname}`;
+    const safeFileName = String(file.originalname || 'upload').replace(/[^\w.-]+/g, '_');
+    const fileName = `uploads/${Date.now()}-${safeFileName}`;
     try {
       const { error: storageError } = await supabase.storage.from(bucketName).upload(fileName, file.buffer, {
         contentType: file.mimetype,

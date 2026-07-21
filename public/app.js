@@ -1,22 +1,32 @@
+const API_BASE_URL = (window.API_BASE_URL || window.location.origin).replace(/\/$/, '');
+const API_AUTH_TOKEN = window.API_AUTH_TOKEN || '';
+
+function buildAuthHeaders(extraHeaders = {}) {
+  const headers = { ...extraHeaders };
+  if (API_AUTH_TOKEN) headers.Authorization = `Bearer ${API_AUTH_TOKEN}`;
+  return headers;
+}
+
 async function uploadFile(file) {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: form });
+  const headers = buildAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/upload`, { method: 'POST', body: form, headers });
   return res.json();
 }
 
 async function fetchEmployees() {
-  const res = await fetch('/api/employees');
+  const res = await fetch(`${API_BASE_URL}/api/employees`);
   return res.json();
 }
 
 async function generatePdf(id) {
-  const res = await fetch(`/api/pdf/generate/${id}`, { method: 'POST' });
+  const res = await fetch(`${API_BASE_URL}/api/pdf/generate/${id}`, { method: 'POST' });
   return res.json();
 }
 
 async function emailPayslip(id, email) {
-  const res = await fetch(`/api/email/${id}`, {
+  const res = await fetch(`${API_BASE_URL}/api/email/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email })
@@ -28,7 +38,8 @@ async function clearAllData() {
   const confirmDelete = window.confirm('This will permanently delete all rows from the payroll records table. Continue?');
   if (!confirmDelete) return;
 
-  const res = await fetch('/api/payroll-records/clear-all?table=payroll_records', { method: 'DELETE' });
+  const headers = buildAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/payroll-records/clear-all?table=payroll_records`, { method: 'DELETE', headers });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok || payload.error) {
     throw new Error(payload.error || 'Failed to clear data');
@@ -154,7 +165,7 @@ function closeEditModal() {
 }
 
 function openPayslip(id) {
-  return fetch(`/api/pdf/generate/${id}`, { method: 'POST' })
+  return fetch(`${API_BASE_URL}/api/pdf/generate/${id}`, { method: 'POST' })
     .then(res => res.json())
     .then(res => {
       if (res.error) throw new Error(res.error);

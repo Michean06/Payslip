@@ -2,12 +2,15 @@
   "name": "payslip-system",
   "version": "0.1.0",
   "private": true,
+  "main": "api/server.js",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "nodemon server/index.js"
+    "dev": "nodemon server/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",
+    "busboy": "^1.1.6",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.18.2",
@@ -18,6 +21,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "form-data": "^4.0.6",
     "nodemon": "^2.0.22"
   }
 }

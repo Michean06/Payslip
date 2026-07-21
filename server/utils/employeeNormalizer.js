@@ -126,28 +126,51 @@ const IMPORT_FIELD_MAP = {
   philhealth_contribution: 'philhealth_employee_share',
   pagibig_contribution: 'pagibig_employee_share',
   net_pay_before_benefits_loans: 'net_pay_before_benefits',
-  overtime: 'overtime_pay'
+  overtime: 'overtime_pay',
+  employee_name: 'employee_name',
+  email_address: 'email_address',
+  payroll_period: 'payroll_period',
+  semi_monthly_basic_pay: 'semi_monthly_basic_pay',
+  semimonthly_basic_pay: 'semi_monthly_basic_pay',
+  taxable_allowances: 'taxable_allowances',
+  gross_taxable_earnings: 'gross_taxable_earnings',
+  taxable_salary_adjustment: 'taxable_salary_adjustment',
+  salary_advance: 'salary_advance',
+  final_take_home_pay: 'final_take_home_pay',
+  sss_employee_share: 'sss_employee_share',
+  philhealth_employee_share: 'philhealth_employee_share',
+  pagibig_employee_share: 'pagibig_employee_share',
+  overtime_pay: 'overtime_pay'
 };
 
-const ALTERNATE_FIELD_MAP = {
-  employee_name: 'name',
-  email_address: 'email',
-  payroll_period: 'pay_period',
-  semi_monthly_basic_pay: 'basic_salary',
-  taxable_allowances: 'allowances',
-  gross_taxable_earnings: 'gross_pay',
-  taxable_salary_adjustment: 'salary_adjustment',
-  salary_advance: 'cash_advance',
-  final_take_home_pay: 'net_pay',
-  sss_employee_share: 'sss_contribution',
-  philhealth_employee_share: 'philhealth_contribution',
-  pagibig_employee_share: 'pagibig_contribution',
-  net_pay_before_benefits: 'net_pay_before_benefits_loans',
-  overtime_pay: 'overtime',
-  phic_number: 'philhealth_number',
-  hdmf_number: 'pagibig_number',
-  philhealth_number: 'phic_number',
-  pagibig_number: 'hdmf_number'
+const COLUMN_ALIASES = {
+  employee_name: ['name', 'employee_name'],
+  email_address: ['email', 'email_address'],
+  payroll_period: ['pay_period', 'payroll_period', 'attendance_period'],
+  semi_monthly_basic_pay: ['basic_salary', 'monthly_basic_pay', 'semi_monthly_basic_pay'],
+  semimonthly_basic_pay: ['basic_salary', 'monthly_basic_pay', 'semi_monthly_basic_pay', 'semimonthly_basic_pay'],
+  taxable_allowances: ['allowances', 'taxable_allowances'],
+  gross_taxable_earnings: ['gross_pay', 'gross_taxable_earnings'],
+  taxable_salary_adjustment: ['salary_adjustment', 'taxable_salary_adjustment'],
+  salary_advance: ['cash_advance', 'salary_advance'],
+  final_take_home_pay: ['net_pay', 'final_take_home_pay'],
+  sss_employee_share: ['sss_contribution', 'sss_employee_share'],
+  philhealth_employee_share: ['philhealth_contribution', 'philhealth_employee_share'],
+  pagibig_employee_share: ['pagibig_contribution', 'pagibig_employee_share'],
+  net_pay_before_benefits: ['net_pay', 'net_pay_before_benefits'],
+  overtime_pay: ['overtime_pay', 'overtime'],
+  name: ['employee_name', 'name'],
+  email: ['email_address', 'email'],
+  pay_period: ['payroll_period', 'pay_period', 'attendance_period'],
+  basic_salary: ['semi_monthly_basic_pay', 'monthly_basic_pay', 'basic_salary'],
+  allowances: ['taxable_allowances', 'allowances'],
+  gross_pay: ['gross_taxable_earnings', 'gross_pay'],
+  salary_adjustment: ['taxable_salary_adjustment', 'salary_adjustment'],
+  cash_advance: ['salary_advance', 'cash_advance'],
+  net_pay: ['final_take_home_pay', 'net_pay'],
+  sss_contribution: ['sss_employee_share', 'sss_contribution'],
+  philhealth_contribution: ['philhealth_employee_share', 'philhealth_contribution'],
+  pagibig_contribution: ['pagibig_employee_share', 'pagibig_contribution']
 };
 
 function mapImportField(fieldName) {
@@ -161,9 +184,12 @@ function resolveTableFieldName(fieldName, availableColumns) {
   const canonical = mapImportField(normalizedField);
   const canonicalLower = String(canonical).trim().toLowerCase();
 
-  const candidates = [canonicalLower, normalizedField];
-  const alternate = ALTERNATE_FIELD_MAP[canonicalLower] || ALTERNATE_FIELD_MAP[normalizedField];
-  if (alternate) candidates.push(String(alternate).trim().toLowerCase());
+  const candidates = [normalizedField, canonicalLower];
+  const aliases = COLUMN_ALIASES[normalizedField] || COLUMN_ALIASES[canonicalLower] || [];
+  aliases.forEach((alias) => {
+    const candidate = String(alias).trim().toLowerCase();
+    if (!candidates.includes(candidate)) candidates.push(candidate);
+  });
 
   for (const candidate of candidates) {
     if (availableColumns.has(candidate)) return availableColumns.get(candidate);

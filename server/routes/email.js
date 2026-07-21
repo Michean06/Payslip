@@ -37,26 +37,16 @@ router.post('/:id', async (req, res) => {
     const employeeCode = employee.employee_id || employee.id || '';
     const subject = `${employeeCode} ${employee.name || ''} Payslip as of ${attendancePeriod}`.trim();
     const messageBody = `Dear ${employee.name || ''},\n\nGood day.\n\nPlease be informed that your payslip for ${attendancePeriod} is attached to this email. Kindly review the details carefully.\n\nThis payslip is confidential and intended solely for your personal record. Please ensure that it is kept secure and not shared with others.\n\nThank you.\n\nBest regards,\nHuman Resources Department\nEast Equator Express Philippines Inc.`;
-    const fromName = process.env.EMAIL_FROM_NAME || 'Human Resources Department';
-    const envFromAddress = process.env.EMAIL_FROM_ADDRESS || '';
-
-    // Determine a clean sender email (prefer explicit BREVO_FROM_EMAIL / GMAIL_FROM_EMAIL)
-    let fromEmail = process.env.BREVO_FROM_EMAIL || process.env.GMAIL_FROM_EMAIL || '';
-    if (!fromEmail && envFromAddress) {
-      const m = String(envFromAddress).match(/<([^>]+)>/);
-      fromEmail = m ? m[1] : envFromAddress.replace(/(^\")|("$)/g, '');
-    }
-    if (!fromEmail) fromEmail = 'marygraceblanco@eastequatorexpress.com';
-
-    const formattedFrom = `"${fromName}" <${fromEmail}>`;
+    const defaultFrom = process.env.EMAIL_FROM_ADDRESS || 'marygraceblanco@eastequatorexpress.com';
+    const formattedFrom = `"Human Resources Department" <${defaultFrom}>`;
 
     // Prefer Brevo (Sendinblue) via API when configured
     const brevoApiKey = process.env.BREVO_API_KEY;
-    const brevoFrom = fromEmail;
+    const brevoFrom = defaultFrom;
     if (brevoApiKey) {
       const payload = {
-        sender: { name: fromName, email: brevoFrom },
-        replyTo: { email: fromEmail, name: fromName },
+        sender: { name: 'Human Resources Department', email: brevoFrom },
+        replyTo: { email: defaultFrom, name: 'Human Resources Department' },
         to: [{ email: requestedEmail, name: employee.name }],
         subject,
         htmlContent: messageBody.replace(/\n/g, '<br/>'),
@@ -119,39 +109,3 @@ router.post('/:id', async (req, res) => {
 });
 
 module.exports = router;
-
-// Temporary debugging endpoint: POST /api/email/test-brevo
-// Body: { to: 'recipient@example.com' }
-router.post('/test-brevo', async (req, res) => {
-  const brevoApiKey = process.env.BREVO_API_KEY;
-  const to = req.body?.to || process.env.BREVO_TEST_TO;
-  const fromName = process.env.EMAIL_FROM_NAME || 'Human Resources Department';
-  const fromEmail = process.env.BREVO_FROM_EMAIL || process.env.GMAIL_FROM_EMAIL || 'marygraceblanco@eastequatorexpress.com';
-
-  if (!brevoApiKey) return res.status(400).json({ error: 'BREVO_API_KEY not configured' });
-  if (!to) return res.status(400).json({ error: 'Missing to address in body or BREVO_TEST_TO env' });
-
-  const payload = {
-    sender: { name: fromName, email: fromEmail },
-    to: [{ email: to, name: 'Test Recipient' }],
-    subject: 'Brevo Test',
-    htmlContent: '<p>Brevo test message</p>'
-  };
-
-  try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'api-key': brevoApiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await resp.json().catch(() => null);
-    if (!resp.ok) {
-      console.error('Brevo test send failed', resp.status, result);
-      return res.status(502).json({ ok: false, status: resp.status, result });
-    }
-    res.json({ ok: true, status: resp.status, result });
-  } catch (err) {
-    console.error('Brevo test exception', err);
-    res.status(500).json({ error: String(err) });
-  }
-});
