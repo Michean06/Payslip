@@ -54,6 +54,15 @@ module.exports = async function handler(req, res) {
   // `/api/` can miss API requests. Call the serverless handler and return its
   // response when possible.
   try {
+    // Quick debug endpoint to verify function invocation in production.
+    if (req.url && req.url.startsWith('/api/__debug')) {
+      // eslint-disable-next-line no-console
+      console.log('DEBUG /api/__debug invoked', { method: req.method, url: req.url, headers: req.headers });
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, method: req.method, url: req.url, headers: req.headers }));
+      return;
+    }
     await serverlessHandler(req, res);
     return;
   } catch (err) {
