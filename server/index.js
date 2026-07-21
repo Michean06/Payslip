@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 
 const uploadRouter = require('./routes/upload');
@@ -36,16 +37,20 @@ const publicDir = path.join(__dirname, '..', 'public');
 const buildDir = path.join(publicDir, 'dist');
 const builtIndexPath = path.join(buildDir, 'index.html');
 
-app.use(express.static(publicDir));
-app.use(express.static(buildDir));
-
 app.get(/^\/(?!api\/).*/, (req, res, next) => {
   if (req.path.includes('.')) {
     return next();
   }
 
-  res.sendFile(builtIndexPath);
+  if (fs.existsSync(builtIndexPath)) {
+    return res.sendFile(builtIndexPath);
+  }
+
+  return next();
 });
+
+app.use(express.static(buildDir));
+app.use(express.static(publicDir));
 
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
