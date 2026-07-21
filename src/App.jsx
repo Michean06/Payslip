@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Route, Routes } from 'react-router-dom';
-import { buildApiUrl, getEmailButtonLabel } from './utils/uiHelpers.mjs';
+import { buildApiUrl, getEmailButtonLabel, parseResponsePayload } from './utils/uiHelpers.mjs';
 
 const SENT_EMAILS_KEY = 'payslip-sent-emails';
 const GENERATED_PDFS_KEY = 'payslip-generated';
@@ -87,7 +87,7 @@ function PayrollDashboard() {
 
     try {
       const response = await fetch(buildApiUrl(apiBaseUrl, '/api/employees'));
-      const payload = await response.json();
+      const payload = await parseResponsePayload(response);
 
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to load employees');
@@ -122,7 +122,7 @@ function PayrollDashboard() {
         method: 'POST',
         body: formData
       });
-      const payload = await response.json();
+      const payload = await parseResponsePayload(response);
 
       if (!response.ok || payload.error) {
         throw new Error(payload.error || 'Upload failed');
@@ -144,7 +144,7 @@ function PayrollDashboard() {
       const response = await fetch(buildApiUrl(apiBaseUrl, `/api/pdf/generate/${employee.id}`), {
         method: 'POST'
       });
-      const payload = await response.json();
+      const payload = await parseResponsePayload(response);
 
       if (!response.ok || payload.error) {
         throw new Error(payload.error || 'Failed to generate payslip');
@@ -197,7 +197,7 @@ function PayrollDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailDraft.trim() })
       });
-      const payload = await response.json();
+      const payload = await parseResponsePayload(response);
 
       if (!response.ok || payload.error) {
         throw new Error(payload.error || 'Failed to send email');
@@ -239,7 +239,7 @@ function PayrollDashboard() {
       const response = await fetch(buildApiUrl(apiBaseUrl, '/api/payroll-records/clear-all?table=payroll_records'), {
         method: 'DELETE'
       });
-      const payload = await response.json().catch(() => ({}));
+      const payload = await parseResponsePayload(response);
 
       if (!response.ok || payload.error) {
         throw new Error(payload.error || 'Failed to clear payroll data');
