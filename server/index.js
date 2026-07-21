@@ -34,7 +34,7 @@ app.use('/api/payroll-records', payrollRecordsRouter);
 
 // static frontend and Vite build output
 const publicDir = path.join(__dirname, '..', 'public');
-const buildDir = path.join(publicDir, 'dist');
+const buildDir = path.join(__dirname, '..', 'dist');
 const builtIndexPath = path.join(buildDir, 'index.html');
 
 app.get(/^\/(?!api\/).*/, (req, res, next) => {
