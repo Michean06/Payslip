@@ -158,11 +158,7 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
 
     const { file } = await parseMultipartUpload(req, { maxFileSize: maxUploadBytes });
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
-    if (!supabase) {
-      return res.status(500).json({
-        error: 'Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the environment and restart the server.'
-      });
-    }
+    const usingFallback = !supabase;
 
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
