@@ -57,10 +57,16 @@ module.exports = async function handler(req, res) {
     await serverlessHandler(req, res);
     return;
   } catch (err) {
-    // If the serverless handler throws, fall through to static file serving.
-    // Log the error for diagnosis in deployment logs.
+    // If the serverless handler throws, return a JSON error so callers
+    // receive a clear response instead of the SPA HTML. Log the error
+    // for diagnosis in deployment logs.
     // eslint-disable-next-line no-console
     console.error('serverless handler error:', err && err.stack ? err.stack : err);
+
+    res.statusCode = 500;
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Server error in API handler', details: String(err?.message || err) }));
+    return;
   }
 
   const relativePath = pathname === '/' ? '' : pathname.replace(/^\/+/, '');
