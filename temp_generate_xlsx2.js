@@ -1,0 +1,14 @@
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+const csvPath = path.join('public', 'sample-import-template.csv');
+const xlsxPath = path.join('public', 'sample-import-template.xlsx');
+const csv = fs.readFileSync(csvPath, 'utf8');
+const workbook = xlsx.read(csv, { type: 'string', raw: false });
+const sheetName = workbook.SheetNames[0];
+const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false });
+const newBook = xlsx.utils.book_new();
+const newSheet = xlsx.utils.aoa_to_sheet(data);
+xlsx.utils.book_append_sheet(newBook, newSheet, 'Template');
+xlsx.writeFile(newBook, xlsxPath);
+console.log('Created', xlsxPath);

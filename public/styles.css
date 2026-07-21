@@ -1,0 +1,7 @@
+body{font-family: Arial, Helvetica, sans-serif;background:#f7f7f7;color:#222}
+.container{max-width:900px;margin:32px auto;padding:20px;background:#fff;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.06)}
+h1{margin-top:0}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #eee;text-align:left}
+button{padding:6px 10px;border:0;background:#0366d6;color:#fff;border-radius:4px;cursor:pointer}
+button:disabled{opacity:.6}
