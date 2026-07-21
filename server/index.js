@@ -31,8 +31,21 @@ app.use('/api/pdf', pdfRouter);
 app.use('/api/email', emailRouter);
 app.use('/api/payroll-records', payrollRecordsRouter);
 
-// static frontend
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// static frontend and Vite build output
+const publicDir = path.join(__dirname, '..', 'public');
+const buildDir = path.join(publicDir, 'dist');
+const builtIndexPath = path.join(buildDir, 'index.html');
+
+app.use(express.static(publicDir));
+app.use(express.static(buildDir));
+
+app.get(/^\/(?!api\/).*/, (req, res, next) => {
+  if (req.path.includes('.')) {
+    return next();
+  }
+
+  res.sendFile(builtIndexPath);
+});
 
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
