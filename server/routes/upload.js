@@ -182,6 +182,12 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
       return res.status(400).json({ error: 'The uploaded file did not produce any valid payroll rows.' });
     }
 
+    if (usingFallback) {
+      const { addEmployees } = require('../fallbackStore');
+      const added = addEmployees(employees);
+      return res.json({ inserted: added, uploaded: null, source: 'fallback' });
+    }
+
     const { data, error } = await supabase.from(tableName).insert(employees).select();
     if (error) {
       console.error('Supabase insert error', error);
