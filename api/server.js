@@ -49,9 +49,18 @@ module.exports = async function handler(req, res) {
   const parsed = new URL(requestUrl, `https://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsed.pathname);
 
-  if (pathname.startsWith('/api/')) {
-    // Delegate API requests to the Express app wrapped by serverless-http
-    return serverlessHandler(req, res);
+  // Always delegate to the Express app first. In Vercel serverless functions
+  // the incoming `req.url` may have the `/api` prefix removed, so checking for
+  // `/api/` can miss API requests. Call the serverless handler and return its
+  // response when possible.
+  try {
+    await serverlessHandler(req, res);
+    return;
+  } catch (err) {
+    // If the serverless handler throws, fall through to static file serving.
+    // Log the error for diagnosis in deployment logs.
+    // eslint-disable-next-line no-console
+    console.error('serverless handler error:', err && err.stack ? err.stack : err);
   }
 
   const relativePath = pathname === '/' ? '' : pathname.replace(/^\/+/, '');
