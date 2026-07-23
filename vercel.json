@@ -20,7 +20,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/server"
     },
     {
       "src": "/assets/(.*)",

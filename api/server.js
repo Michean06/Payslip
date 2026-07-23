@@ -44,10 +44,41 @@ const serverless = require('serverless-http');
 const expressApp = require('../server');
 const serverlessHandler = serverless(expressApp);
 
+function normalizeApiPathname(pathname) {
+  if (!pathname || pathname === '/') {
+    return '/api';
+  }
+
+  if (pathname.startsWith('/api/')) {
+    return pathname;
+  }
+
+  const apiPrefixes = [
+    '/employees',
+    '/upload',
+    '/pdf',
+    '/email',
+    '/payroll-records',
+    '/health',
+    '/__debug'
+  ];
+
+  if (apiPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'))) {
+    return `/api${pathname}`;
+  }
+
+  return pathname;
+}
+
 module.exports = async function handler(req, res) {
   const requestUrl = req.url || '/';
   const parsed = new URL(requestUrl, `https://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsed.pathname);
+  const normalizedPathname = normalizeApiPathname(pathname);
+  if (normalizedPathname !== pathname) {
+    parsed.pathname = normalizedPathname;
+    req.url = parsed.pathname + parsed.search;
+  }
 
   // Always delegate to the Express app first. In Vercel serverless functions
   // the incoming `req.url` may have the `/api` prefix removed, so checking for
