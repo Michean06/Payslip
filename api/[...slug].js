@@ -4,7 +4,17 @@ const uploadHandler = require('./upload');
 function getPathname(req) {
   const requestUrl = req.url || '/';
   const parsed = new URL(requestUrl, 'https://localhost');
-  return decodeURIComponent(parsed.pathname);
+  const pathname = decodeURIComponent(parsed.pathname);
+
+  if (!pathname || pathname === '/') {
+    return '/api';
+  }
+
+  if (pathname.startsWith('/api/')) {
+    return pathname;
+  }
+
+  return `/api${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
 }
 
 module.exports = async function catchAllApiHandler(req, res) {
