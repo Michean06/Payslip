@@ -1,26 +1,24 @@
-const express = require('express');
-const serverless = require('serverless-http');
-const employeesRouter = require('../server/routes/employees');
-const uploadRouter = require('../server/routes/upload');
-const emailRouter = require('../server/routes/email');
-const payrollRecordsRouter = require('../server/routes/payrollRecords');
-const pdfRouter = require('../server/routes/pdf');
+const employeesHandler = require('./employees');
+const uploadHandler = require('./upload');
 
-const app = express();
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use('/api/employees', employeesRouter);
-app.use('/api/upload', uploadRouter);
-app.use('/api/email', emailRouter);
-app.use('/api/payroll-records', payrollRecordsRouter);
-app.use('/api/pdf', pdfRouter);
-
-const handler = serverless(app);
+function getPathname(req) {
+  const requestUrl = req.url || '/';
+  const parsed = new URL(requestUrl, 'https://localhost');
+  return decodeURIComponent(parsed.pathname);
+}
 
 module.exports = async function catchAllApiHandler(req, res) {
-  if (req.url && !req.url.startsWith('/api')) {
-    req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
+  const pathname = getPathname(req);
+
+  if (pathname === '/api/employees') {
+    return employeesHandler(req, res);
   }
 
-  return handler(req, res);
+  if (pathname === '/api/upload') {
+    return uploadHandler(req, res);
+  }
+
+  res.statusCode = 404;
+  res.setHeader('content-type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify({ error: 'Not found' }));
 };
