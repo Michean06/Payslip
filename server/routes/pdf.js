@@ -32,7 +32,7 @@ router.post('/generate/:id', async (req, res) => {
     const buffer = await generatePayslipPdf(employee);
     
     // Try Supabase storage first
-    if (supabase) {
+    if (supabase && supabase.__isConfigured) {
       try {
         const path = `payslips/${id}.pdf`;
         const { error: uploadErr } = await supabase.storage.from(bucketName).upload(path, buffer, {

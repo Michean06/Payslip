@@ -11,7 +11,7 @@ const bucketName = process.env.SUPABASE_BUCKET || 'payslips';
 const maxUploadBytes = Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024);
 
 async function getTableColumns(tableName) {
-  if (!supabase) return [];
+  if (!supabase || !supabase.__isConfigured) return [];
   try {
     const { data, error } = await supabase.rpc('get_table_columns', { target_table: tableName });
     if (!error && Array.isArray(data) && data.length) {
@@ -156,9 +156,15 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
       return res.status(415).json({ error: 'Expected multipart/form-data upload.' });
     }
 
+    if (!supabase || !supabase.__isConfigured) {
+      return res.status(503).json({
+        error: 'Upload failed because Supabase is not configured. Set SUPABASE_URL and a Supabase API key, then restart the server.',
+        configured: false
+      });
+    }
+
     const { file } = await parseMultipartUpload(req, { maxFileSize: maxUploadBytes });
     if (!file) return res.status(400).json({ error: 'No file uploaded' });
-    const usingFallback = !supabase;
 
     const workbook = xlsx.read(file.buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -178,30 +184,39 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
       return res.status(400).json({ error: 'The uploaded file did not produce any valid payroll rows.' });
     }
 
-    if (usingFallback) {
-      const { addEmployees } = require('../fallbackStore');
-      const added = addEmployees(employees);
-      return res.json({ inserted: added, uploaded: null, source: 'fallback' });
+    let data;
+    let error;
+    try {
+      ({ data, error } = await supabase.from(tableName).insert(employees).select());
+    } catch (insertErr) {
+      console.error('Supabase insert exception', insertErr);
+      const detail = insertErr?.message || String(insertErr || '');
+      return res.status(502).json({
+        error: `Upload failed while contacting Supabase. ${detail}`,
+        table: tableName
+      });
     }
 
-    const { data, error } = await supabase.from(tableName).insert(employees).select();
     if (error) {
       console.error('Supabase insert error', error);
       const msg = String(error.message || '');
+      const details = error.details ? String(error.details) : '';
+      const hint = error.hint ? String(error.hint) : '';
+      const combinedDetails = [msg, details, hint].filter(Boolean).join(' ');
 
       if (/row-level security|violates row-level security/i.test(msg)) {
         const serverKeySet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
         const guidance = serverKeySet
           ? `Supabase rejected the insert due to RLS. Check the table's row-level policies in the Supabase dashboard for "${tableName}".`
           : `The server is not using a Supabase service-role key. Set SUPABASE_SERVICE_ROLE_KEY in your environment (see .env.example) and restart the server, or update the table's RLS policies to allow inserts.`;
-        return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
+        return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName, details: combinedDetails });
       }
 
       const missingColumn = /Could not find the '([^']+)' column/i.exec(msg);
       const guidance = missingColumn
         ? `The ${tableName} table is missing the required '${missingColumn[1]}' column. Run the updated schema.sql in the Supabase SQL Editor, then retry the import.`
-        : msg || String(error);
-      return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName });
+        : combinedDetails || msg || String(error);
+      return res.status(502).json({ error: `Supabase schema needs updating. ${guidance}`, table: tableName, details: combinedDetails });
     }
 
     const safeFileName = String(file.originalname || 'upload').replace(/[^\w.-]+/g, '_');

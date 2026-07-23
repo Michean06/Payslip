@@ -7,7 +7,7 @@ const tableName = process.env.SUPABASE_TABLE || 'payroll_records';
 
 router.get('/', async (req, res) => {
   try {
-    if (supabase) {
+    if (supabase && supabase.__isConfigured) {
       try {
         const { data, error } = await supabase.from(tableName).select('*').order('id', { ascending: true });
         if (!error && data) return res.json(data.map(normalizeEmployee));

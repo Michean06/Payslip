@@ -10,6 +10,19 @@ const { normalizeEmployee } = require('../utils/employeeNormalizer');
 const router = express.Router();
 const tableName = process.env.SUPABASE_TABLE || 'payroll_records';
 
+function buildGmailTransportConfig({ gmailUser, gmailAppPassword }) {
+  return {
+    service: 'gmail',
+    auth: {
+      user: gmailUser,
+      pass: gmailAppPassword
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  };
+}
+
 // POST /api/email/:id
 router.post('/:id', async (req, res) => {
   try {
@@ -20,7 +33,7 @@ router.post('/:id', async (req, res) => {
       employee = normalizeEmployee(req.body.employee);
     }
 
-    if (!employee && supabase) {
+    if (!employee && supabase && supabase.__isConfigured) {
       try {
         const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
         if (!error && data) employee = normalizeEmployee(data);
@@ -46,9 +59,40 @@ router.post('/:id', async (req, res) => {
     const defaultFrom = process.env.EMAIL_FROM_ADDRESS || 'marygraceblanco@eastequatorexpress.com';
     const formattedFrom = `"Human Resources Department" <${defaultFrom}>`;
 
-    // Prefer Brevo (Sendinblue) via API when configured
     const brevoApiKey = process.env.BREVO_API_KEY;
     const brevoFrom = defaultFrom;
+
+    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_FROM_EMAIL;
+    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+
+    if (gmailUser && gmailAppPassword) {
+      try {
+        const transporter = nodemailer.createTransport(
+          buildGmailTransportConfig({ gmailUser, gmailAppPassword })
+        );
+
+        const mailOptions = {
+          from: formattedFrom,
+          to: requestedEmail,
+          subject,
+          text: messageBody,
+          replyTo: defaultFrom,
+          attachments: [
+            {
+              filename: `payslip-${id}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
+            }
+          ]
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        return res.json({ success: true, provider: 'gmail', info });
+      } catch (gmailError) {
+        console.warn('Gmail send failed, trying Brevo fallback', gmailError);
+      }
+    }
+
     if (brevoApiKey) {
       const payload = {
         sender: { name: 'Human Resources Department', email: brevoFrom },
@@ -75,48 +119,17 @@ router.post('/:id', async (req, res) => {
       return res.json({ success: true, provider: 'brevo', result });
     }
 
-    // Fallback to Gmail via Nodemailer if Brevo not configured
-    const gmailUser = process.env.GMAIL_USER || process.env.GMAIL_FROM_EMAIL;
-    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
-
-    if (!gmailUser || !gmailAppPassword) {
-      const localEmailDir = path.join(__dirname, '..', '..', '.tmp-email-preview');
-      fs.mkdirSync(localEmailDir, { recursive: true });
-      const previewFile = path.join(localEmailDir, `payslip-${id}-${Date.now()}.eml`);
-      const previewContent = `To: ${requestedEmail}\nSubject: ${subject}\n\n${messageBody}`;
-      fs.writeFileSync(previewFile, previewContent, 'utf8');
-      return res.json({ success: true, provider: 'local-preview', previewFile });
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailUser,
-        pass: gmailAppPassword
-      }
-    });
-
-    const mailOptions = {
-      from: formattedFrom,
-      to: requestedEmail,
-      subject,
-      text: messageBody,
-      replyTo: defaultFrom,
-      attachments: [
-        {
-          filename: `payslip-${id}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf'
-        }
-      ]
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    res.json({ success: true, provider: 'gmail', info });
+    const localEmailDir = path.join(__dirname, '..', '..', '.tmp-email-preview');
+    fs.mkdirSync(localEmailDir, { recursive: true });
+    const previewFile = path.join(localEmailDir, `payslip-${id}-${Date.now()}.eml`);
+    const previewContent = `To: ${requestedEmail}\nSubject: ${subject}\n\n${messageBody}`;
+    fs.writeFileSync(previewFile, previewContent, 'utf8');
+    return res.json({ success: true, provider: 'local-preview', previewFile });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
   }
 });
 
+router.buildGmailTransportConfig = buildGmailTransportConfig;
 module.exports = router;

@@ -12,7 +12,7 @@ function getTableName(requestedTable) {
 }
 
 async function getTableColumns(tableName) {
-  if (!supabase) {
+  if (!supabase || !supabase.__isConfigured) {
     const error = new Error('Supabase client is not configured.');
     error.status = 500;
     throw error;
@@ -122,7 +122,7 @@ router.delete('/clear-all', requireAdminAuthIfConfigured, async (req, res) => {
   const tableName = getTableName(req.query.table || req.body?.table || 'payroll_records');
   if (!tableName) return res.status(400).json({ error: 'Unsupported table requested.' });
 
-  if (!supabase) {
+  if (!supabase || !supabase.__isConfigured) {
     const deletedCount = fallbackStore.clearPayrollRecords();
     return res.json({ success: true, table: tableName, deletedCount, source: 'fallback' });
   }
