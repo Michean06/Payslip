@@ -15,6 +15,10 @@
   ],
   "routes": [
     {
+      "src": "/sample-import-template.csv",
+      "dest": "/api/sample-import-template"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     },
