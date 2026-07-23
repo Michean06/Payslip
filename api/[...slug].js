@@ -1,20 +1,10 @@
 const employeesHandler = require('./employees');
-const uploadHandler = require('./upload');
+const healthHandler = require('./health');
 
 function getPathname(req) {
   const requestUrl = req.url || '/';
   const parsed = new URL(requestUrl, 'https://localhost');
-  const pathname = decodeURIComponent(parsed.pathname);
-
-  if (!pathname || pathname === '/') {
-    return '/api';
-  }
-
-  if (pathname.startsWith('/api/')) {
-    return pathname;
-  }
-
-  return `/api${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+  return decodeURIComponent(parsed.pathname);
 }
 
 module.exports = async function catchAllApiHandler(req, res) {
@@ -24,8 +14,8 @@ module.exports = async function catchAllApiHandler(req, res) {
     return employeesHandler(req, res);
   }
 
-  if (pathname === '/api/upload') {
-    return uploadHandler(req, res);
+  if (pathname === '/api/health') {
+    return healthHandler(req, res);
   }
 
   res.statusCode = 404;
