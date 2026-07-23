@@ -21,6 +21,5 @@ module.exports = function sampleImportTemplateHandler(req, res) {
   const content = fs.readFileSync(templatePath, 'utf8');
   res.statusCode = 200;
   res.setHeader('content-type', 'text/csv; charset=utf-8');
-  res.setHeader('content-disposition', 'attachment; filename="sample-import-template.csv"');
   res.end(content);
 };
