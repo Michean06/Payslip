@@ -54,37 +54,5 @@ const exportedClient = supabase || {
   }
 };
 
-function runWithTimeout(promiseFactory, timeoutMs = Number(process.env.SUPABASE_QUERY_TIMEOUT_MS || 2500)) {
-  const safeTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 2500;
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve({ data: null, error: new Error(`Supabase request timed out after ${safeTimeoutMs}ms`), timedOut: true });
-      }
-    }, safeTimeoutMs);
-
-    Promise.resolve()
-      .then(() => promiseFactory())
-      .then((result) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve(result);
-        }
-      })
-      .catch((err) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timer);
-          resolve({ data: null, error: err, timedOut: false });
-        }
-      });
-  });
-}
-
 exportedClient.__isConfigured = hasRealConfig;
-exportedClient.__runWithTimeout = runWithTimeout;
 module.exports = exportedClient;

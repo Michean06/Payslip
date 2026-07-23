@@ -30,15 +30,3 @@ test('placeholder Supabase values are treated as unconfigured', () => {
   });
   delete require.cache[require.resolve(supabaseClientPath)];
 });
-
-test('runWithTimeout returns a timeout result for slow Supabase requests', async () => {
-  const supabaseClient = require(supabaseClientPath);
-  const result = await supabaseClient.__runWithTimeout(
-    () => new Promise((resolve) => setTimeout(() => resolve({ data: [{ id: 1 }] }), 100)),
-    10
-  );
-
-  assert.equal(result.timedOut, true);
-  assert.match(result.error.message, /timed out/i);
-  assert.equal(result.data, null);
-});
