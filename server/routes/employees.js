@@ -9,9 +9,9 @@ router.get('/', async (req, res) => {
   try {
     if (supabase && supabase.__isConfigured) {
       try {
-        const { data, error } = await supabase.from(tableName).select('*').order('id', { ascending: true });
-        if (!error && data) return res.json(data.map(normalizeEmployee));
-        console.warn('Falling back to in-memory employee store', error);
+        const result = await supabase.__runWithTimeout(() => supabase.from(tableName).select('*').order('id', { ascending: true }));
+        if (!result?.timedOut && !result?.error && result?.data) return res.json(result.data.map(normalizeEmployee));
+        console.warn('Falling back to in-memory employee store', result?.error || (result?.timedOut ? 'timeout' : null));
       } catch (err) {
         console.warn('Supabase employee fetch failed, using fallback store', err);
       }

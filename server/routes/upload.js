@@ -13,18 +13,18 @@ const maxUploadBytes = Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024);
 async function getTableColumns(tableName) {
   if (!supabase || !supabase.__isConfigured) return [];
   try {
-    const { data, error } = await supabase.rpc('get_table_columns', { target_table: tableName });
-    if (!error && Array.isArray(data) && data.length) {
-      return data.map((column) => String(column.column_name || '').trim()).filter(Boolean);
+    const rpcResult = await supabase.__runWithTimeout(() => supabase.rpc('get_table_columns', { target_table: tableName }));
+    if (!rpcResult?.timedOut && !rpcResult?.error && Array.isArray(rpcResult?.data) && rpcResult.data.length) {
+      return rpcResult.data.map((column) => String(column.column_name || '').trim()).filter(Boolean);
     }
   } catch (err) {
     console.warn('get_table_columns RPC failed', err.message || err);
   }
 
   try {
-    const { data, error } = await supabase.from(tableName).select('*').limit(1);
-    if (!error && Array.isArray(data) && data.length) {
-      return Object.keys(data[0]).map((key) => String(key).trim());
+    const fallbackResult = await supabase.__runWithTimeout(() => supabase.from(tableName).select('*').limit(1));
+    if (!fallbackResult?.timedOut && !fallbackResult?.error && Array.isArray(fallbackResult?.data) && fallbackResult.data.length) {
+      return Object.keys(fallbackResult.data[0]).map((key) => String(key).trim());
     }
   } catch (err) {
     console.warn('Table column fallback failed', err.message || err);
@@ -187,7 +187,14 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
     let data;
     let error;
     try {
-      ({ data, error } = await supabase.from(tableName).insert(employees).select());
+      const insertResult = await supabase.__runWithTimeout(() => supabase.from(tableName).insert(employees).select());
+      if (insertResult?.timedOut) {
+        return res.status(502).json({
+          error: 'Upload failed because Supabase did not respond in time.',
+          table: tableName
+        });
+      }
+      ({ data, error } = insertResult || {});
     } catch (insertErr) {
       console.error('Supabase insert exception', insertErr);
       const detail = insertErr?.message || String(insertErr || '');
@@ -222,11 +229,15 @@ router.post('/', requireAdminAuthIfConfigured, async (req, res) => {
     const safeFileName = String(file.originalname || 'upload').replace(/[^\w.-]+/g, '_');
     const fileName = `uploads/${Date.now()}-${safeFileName}`;
     try {
-      const { error: storageError } = await supabase.storage.from(bucketName).upload(fileName, file.buffer, {
+      const storageResult = await supabase.__runWithTimeout(() => supabase.storage.from(bucketName).upload(fileName, file.buffer, {
         contentType: file.mimetype,
         upsert: false
-      });
-      if (storageError) console.warn('Storage upload warning', storageError.message || storageError);
+      }));
+      if (storageResult?.timedOut) {
+        console.warn('Storage upload timed out');
+      } else if (storageResult?.error) {
+        console.warn('Storage upload warning', storageResult.error.message || storageResult.error);
+      }
     } catch (err) {
       console.warn('Storage upload exception', err);
     }

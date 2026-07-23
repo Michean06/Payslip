@@ -18,9 +18,9 @@ module.exports = async function employeesHandler(req, res) {
   try {
     if (supabase && supabase.__isConfigured) {
       try {
-        const { data, error } = await supabase.from(tableName).select('*').order('id', { ascending: true });
-        if (!error && data) {
-          return sendJson(res, 200, data.map(normalizeEmployee));
+        const result = await supabase.__runWithTimeout(() => supabase.from(tableName).select('*').order('id', { ascending: true }));
+        if (!result?.timedOut && !result?.error && result?.data) {
+          return sendJson(res, 200, result.data.map(normalizeEmployee));
         }
       } catch (err) {
         console.warn('Supabase employee fetch failed, using fallback store', err);
