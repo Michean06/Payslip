@@ -45,6 +45,11 @@ const expressApp = require('../server');
 const serverlessHandler = serverless(expressApp);
 
 module.exports = async function handler(req, res) {
+  if (req.url && !req.url.startsWith('/api')) {
+    const normalizedUrl = req.url.startsWith('/') ? req.url : `/${req.url}`;
+    req.url = `/api${normalizedUrl}`;
+  }
+
   const requestUrl = req.url || '/';
   const parsed = new URL(requestUrl, `https://${req.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(parsed.pathname);
