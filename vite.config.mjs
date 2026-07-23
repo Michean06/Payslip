@@ -12,7 +12,7 @@ export default defineConfig({
       }
     }
   },
-  publicDir: false,
+  publicDir: 'public',
   build: {
     outDir: 'dist',
     emptyOutDir: true
