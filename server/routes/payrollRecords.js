@@ -1,5 +1,6 @@
 const express = require('express');
 const supabase = require('../supabaseClient');
+const fallbackStore = require('../fallbackStore');
 const { requireAdminAuthIfConfigured } = require('../middleware/adminAuth');
 const router = express.Router();
 
@@ -122,7 +123,8 @@ router.delete('/clear-all', requireAdminAuthIfConfigured, async (req, res) => {
   if (!tableName) return res.status(400).json({ error: 'Unsupported table requested.' });
 
   if (!supabase) {
-    return res.status(500).json({ error: 'Supabase client is not configured.' });
+    const deletedCount = fallbackStore.clearPayrollRecords();
+    return res.json({ success: true, table: tableName, deletedCount, source: 'fallback' });
   }
 
   try {

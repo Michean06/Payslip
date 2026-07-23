@@ -22,8 +22,16 @@ function getEmployeeById(id) {
   return employees.find((employee) => String(employee.id) === String(id));
 }
 
+function clearPayrollRecords() {
+  const deletedCount = employees.length;
+  employees.length = 0;
+  nextId = 1;
+  return deletedCount;
+}
+
 module.exports = {
   addEmployees,
   listEmployees,
-  getEmployeeById
+  getEmployeeById,
+  clearPayrollRecords
 };
