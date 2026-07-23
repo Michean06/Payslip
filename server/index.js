@@ -64,7 +64,8 @@ const templatePath = path.join(process.env.USERPROFILE || process.env.HOME || ''
 
 app.get('/sample-import-template.csv', (req, res) => {
   if (fs.existsSync(templatePath)) {
-    res.download(templatePath, 'sample-import-template.csv');
+    res.setHeader('content-type', 'text/csv; charset=utf-8');
+    res.sendFile(templatePath);
     return;
   }
 

@@ -247,7 +247,7 @@ function PayrollDashboard() {
 
           <div className="actions-row">
             <button type="submit" className="btn btn-primary">Upload</button>
-            <a href="/sample-import-template.csv" className="btn btn-success">Download import template</a>
+            <a href="/sample-import-template.csv" download="sample-import-template.csv" className="btn btn-success">Download import template</a>
             <button type="button" className="btn btn-danger" onClick={handleClearData}>Delete All Data</button>
           </div>
         </form>
